@@ -1,0 +1,12 @@
+full_name --required
+civil_status --required
+address --required
+ticket_number --required
+violation --required
+violation_location --required
+day --required
+month --required
+year --required
+id_number --required
+id_issuer --required
+sample_optional
