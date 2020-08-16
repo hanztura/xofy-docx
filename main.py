@@ -2,10 +2,37 @@
 import datetime
 import os
 import stringcase
+import json
 
 from docxtpl import DocxTemplate
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 from settings import *
+from models import Base, Document
+
+
+engine = create_engine(DB_NAME, echo=True)
+
+
+def create_db_engine():
+    engine = create_engine(DB_NAME, echo=True)
+    return engine
+
+
+def create_db_tables(engine):
+    Base.metadata.create_all(engine)
+
+
+def save_to_db(output, context, created):
+    d = Document(filename=output, data=json.dumps(context), created=created)
+
+    Session = sessionmaker(bind=engine)
+    session = Session()
+    session.add(d)
+    session.commit()
+
+    return d
 
 
 def get_user_input(msg, is_required=False):
@@ -73,9 +100,9 @@ def print_available_documents(documents):
         print(index, stringcase.titlecase(doc))
 
 
-def get_output_filename():
+def get_output_filename(timestamp):
     return "output--{}.docx".format(
-        datetime.datetime.now().strftime(TIMESTAMP_FORMAT)
+        timestamp.strftime(TIMESTAMP_FORMAT)
     )
 
 
@@ -87,6 +114,7 @@ def main():
         "Type number of document to workon: ",
         True
     ))
+    timestamp = datetime.datetime.now()
 
     template = os.path.join(
         DOCUMENTS_DIRECTORY,
@@ -102,15 +130,20 @@ def main():
         DOCUMENTS_DIRECTORY,
         documents[workon],
         "outputs",
-        get_output_filename(),
+        get_output_filename(timestamp),
     )
 
     # get the template document
     doc = DocxTemplate(template)
 
     # render
-    doc.render(get_context(get_variables(variables)))
+    context = get_context(get_variables(variables))
+    doc.render(context)
     doc.save(output)
+
+    create_db_tables(engine)
+    context['timestamp'] = str(timestamp)
+    save_to_db(output, context, timestamp)
 
 
 if __name__ == '__main__':
